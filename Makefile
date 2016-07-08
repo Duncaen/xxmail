@@ -3,14 +3,19 @@ CFLAGS = -g -Wall -O2 -MD -MP -I./compat
 LDFLAGS =
 
 SRCS = compat/strlcpy.c compat/strlcat.c
-SRCS+= query.c maildir.c mail.c lsmail.c
+SRCS+= query.c maildir.c mail.c
 OBJS = $(SRCS:.c=.o)
 
-lsmail: $(OBJS)
-	$(CC) -o $@ $(OBJS) $(LDFLAGS)
+all: lsmail edmail
+
+lsmail: lsmail.o $(OBJS)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+edmail: edmail.o $(OBJS)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -rf lsmail $(OBJS) $(OBJS:.o=.d)
+	rm -rf lsmail edmail $(OBJS) $(OBJS:.o=.d)
 
 -include ${OBJS:.o=.d}
 
