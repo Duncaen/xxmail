@@ -12,6 +12,17 @@ static char *format;
 
 static char default_format[] = "%i [%F] [%S]\n";
 
+static TAILQ_HEAD(, mail) results;
+static int num_result = 0;
+
+
+static void
+usage()
+{
+	fprintf(stderr, "Usage: %s [-f FMT] PATH...\n", argv0);
+	exit(2);
+}
+
 void
 analyze_format(struct query *q)
 {
@@ -71,17 +82,23 @@ print_format(struct mail *m)
 	}
 }
 
-static void
-usage()
+void
+lazy_result_cb(struct query *q, struct mail *m, void *arg)
 {
-	fprintf(stderr, "Usage: %s [-f FMT] PATH...\n", argv0);
-	exit(2);
+	TAILQ_INSERT_TAIL(&results, m, next);
+}
+
+void
+print_result_cb(struct query *q, struct mail *m, void *arg)
+{
+	print_format(m);
+	num_result++;
 }
 
 int
 main(int argc, char *argv[])
 {
-	int c, i;
+	int c, i, lazy;
 	struct stat st;
 	struct query *q;
 	struct mailbox *mb;
@@ -89,6 +106,7 @@ main(int argc, char *argv[])
 
 	argv0 = argv[0];
 	format = default_format;
+	lazy = 0;
 
 	while ((c = getopt(argc, argv, "f:")) != -1) {
 		switch (c) {
@@ -117,14 +135,22 @@ main(int argc, char *argv[])
 	q->new = 1;
 	q->old = 1;
 
+	if (lazy) {
+		TAILQ_INIT(&results);
+		query_add_result_cb(q, lazy_result_cb);
+	} else
+		query_add_result_cb(q, print_result_cb);
+
 	query_run(q);
 
-	i = 0;
-	TAILQ_FOREACH(m, &q->results, next) {
-		print_format(m);
-		i++;
+	if (lazy) {
+		TAILQ_FOREACH(m, &results, next) {
+			print_format(m);
+			num_result++;
+		}
 	}
-	fprintf(stderr, "N%d\n", i);
+
+	fprintf(stderr, "N%d\n", num_result);
 
 	return 0;
 }

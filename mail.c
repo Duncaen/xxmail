@@ -47,6 +47,7 @@ static int
 mail_parse_hdr(struct mail *m, char *b)
 {
 	int l = strlen(b);
+
 	if (l > 4 && b[4] == ':') {
 		if (b[0] == 'f' && b[1] == 'r' &&
 				b[2] == 'o' && b[3] == 'm') {
@@ -127,11 +128,42 @@ mail_mmnormalize(char *start, size_t len)
 }
 
 int
+mail_parse(struct mail *m, char *buf, char *end)
+{
+	char *r;
+	int in_hdr;
+
+	r = buf;
+	in_hdr = 1;
+
+	while (r < end) {
+		if (r[0] == '\0' && *r++) {
+			in_hdr = 0;
+			continue;
+		}
+		if (in_hdr) {
+			mail_parse_hdr(m, r);
+			query_header_cb(m->query, m, r);
+		}
+		/*
+		 * XXX: do something with the message
+		 */
+		r = r + strlen(r) + 1;
+	}
+
+	query_result_cb(m->query, m);
+
+	return 0;
+}
+
+int
 mail_mmap(struct mail *m, const char *path)
 {
 	char *b;
-	int fd;
+	int fd, rv;
 	struct stat st;
+
+	rv = 0;
 
 	if ((fd = open(path, O_RDONLY)) < 0)
 		err(1, "open");
@@ -147,6 +179,8 @@ mail_mmap(struct mail *m, const char *path)
 	
 	mail_mmnormalize(b, (size_t) st.st_size);
 
+	rv = mail_parse(m, b, b + st.st_size);
+
 	/*
 	char *needle = " from:";
 	size_t needle_len = strlen(needle) + 1;
@@ -160,23 +194,6 @@ mail_mmap(struct mail *m, const char *path)
 		printf("FROM: %s\n%s\n", from, path);
 	}
 	*/
-
-	int in_hdr = 1;
-	char *r = b;
-	while (r < (b + st.st_size)) {
-		if (r[0] == '\0') {
-			in_hdr = 0;
-			r = r + 1;
-			continue;
-		}
-		if (in_hdr)
-			mail_parse_hdr(m, r);
-		/*
-		else
-			printf("LN: '%c' '%d' '%s'\n", r[0], r == '\0', r);
-		*/
-		r = r + strlen(r) + 1;
-	}
 
 	munmap(b, st.st_size);
 	close(fd);

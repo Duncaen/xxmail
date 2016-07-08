@@ -55,7 +55,6 @@ maildir_read(struct mailbox *mb, struct query *q, const char *dir)
 
 			m = mail_init(q);
 			mail_mmap(m, d->d_name);
-			query_add_result(q, m);
 
 next:
 			bpos += d->d_reclen;

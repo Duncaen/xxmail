@@ -13,26 +13,20 @@ enum hdr {
 	HDR_IN_REPLY_TO,
 };
 
-struct result {
-	int *hdrs;
-	struct query *q;
-	TAILQ_HEAD(, mail) mails;
-};
-
 struct query {
 	int hdr;
 	int msgbox;
 	int new;
 	int old;
 	TAILQ_HEAD(, mailbox) boxes;
-	TAILQ_HEAD(, mail) results;
-	struct regex_t *preg;
+	TAILQ_HEAD(, header_cb) header_cb;
+	TAILQ_HEAD(, result_cb) result_cb;
 };
 
 struct mailbox {
 	TAILQ_ENTRY(mailbox) next;
 	int (*query)(struct mailbox *mb, struct query *q);
-	void *data;
+	void *arg;
 	char *path;
 };
 
@@ -51,15 +45,39 @@ struct maildir {
 	int fdcur;
 };
 
+/**/
+typedef int (*header_cb_func)(struct query *q, struct mail *m,
+    char *hdr, void *arg);
+
+/**/
+typedef void (*result_cb_func)(struct query *q, struct mail *m,
+    void *arg);
+
+struct header_cb {
+	TAILQ_ENTRY(header_cb) next;
+	header_cb_func func;
+	void *arg;
+};
+
+struct result_cb {
+	TAILQ_ENTRY(result_cb) next;
+	result_cb_func func;
+	void *arg;
+};
+
 /* compat */
 size_t strlcpy(char *dst, const char *src, size_t dsize);
 size_t strlcat(char *dst, const char *src, size_t dsize);
 
 /* query */
-int query_run(struct query *q);
 void query_add_mailbox(struct query *q, struct mailbox *mb);
-void query_add_result(struct query *q, struct mail *m);
+void query_add_header_cb(struct query *q, header_cb_func f);
+void query_add_result_cb(struct query *q, result_cb_func f);
+int query_header_cb(struct query *q, struct mail *m, char *hdr);
+int query_result_cb(struct query *q, struct mail *m);
+int query_run(struct query *q);
 struct query * query_init();
+void query_free(struct query *q);
 
 /* maildir */
 int maildir_query(struct mailbox *mb, struct query *q);
